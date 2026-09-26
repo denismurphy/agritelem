@@ -1,0 +1,35 @@
+# Local stack: `make up` starts it, `make down` removes it and its data.
+services:
+  db:
+    image: timescale/timescaledb:2.30.1-pg17
+    environment:
+      POSTGRES_USER: agritelem
+      POSTGRES_PASSWORD: agritelem-dev-only
+      POSTGRES_DB: agritelem
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agritelem -d agritelem"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  api:
+    build: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      AGRITELEM_DATABASE_URL: postgres://agritelem:agritelem-dev-only@db:5432/agritelem?sslmode=disable
+      AGRITELEM_JWT_PUBLIC_KEY_FILE: /run/secrets/jwt-public.pem
+      AGRITELEM_PUBLIC_URL: http://localhost:8080
+      AGRITELEM_MIGRATE_ON_START: "true"
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./.dev/jwt-public.pem:/run/secrets/jwt-public.pem:ro
+
+volumes:
+  db-data:
