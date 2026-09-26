@@ -1,0 +1,7 @@
+# Generated from contracts/openapi.json (symlinked), the same document the Go
+# server is generated from.
+generate:
+  - types
+  - client
+accessModifier: package
+namingStrategy: idiomatic
