@@ -1,0 +1,236 @@
+# Agritelem contract extension over ICAR ADE 1.5.1.
+#
+# contractgen (backend/cmd/contractgen) builds contracts/openapi.json from:
+#   1. the ICAR operations selected in x-agritelem-contract.icarOperations,
+#   2. an additive deep-merge of `paths` and `components` below,
+#   3. the transitive closure of referenced components.
+#
+# Merge rules, enforced by contractgen:
+#   - Maps merge recursively; arrays append elements not already present.
+#   - A scalar that already exists in ICAR with a different value is an error:
+#     the extension may add to ICAR, never change it.
+#   - New paths must start with /agritelem/; new schema names with "agritelem".
+#   - info, servers and security are replaced wholesale.
+
+x-agritelem-contract:
+  icarOperations:
+    /locations/{location-scheme}/{location-id}/animals: [get]
+    /locations/{location-scheme}/{location-id}/devices: [get]
+    /locations/{location-scheme}/{location-id}/remarks: [get, post]
+    /locations/{location-scheme}/{location-id}/observation-summary-metrics: [get]
+    /batches/locations/{location-scheme}/{location-id}/observation-summary-metrics: [post]
+
+openapi: 3.1.0
+
+info:
+  title: Agritelem API
+  version: 0.1.0
+  description: |
+    Precision livestock telemetry API. A subset of ICAR Animal Data Exchange
+    (ADE) 1.5.1 with additive Agritelem extensions. Every Agritelem-specific
+    property lives under an `agritelem` object or an `agritelem*` schema, and
+    every Agritelem-specific path under `/agritelem/`.
+  license:
+    name: Apache-2.0 (ICAR ADE schemas); MIT (Agritelem extensions)
+
+servers:
+  - url: http://localhost:8080
+
+security:
+  - bearerAuth: []
+
+paths:
+  /locations/{location-scheme}/{location-id}/animals:
+    get:
+      parameters:
+        - $ref: "#/components/parameters/meta-modified-from"
+        - $ref: "#/components/parameters/agritelemPageSize"
+        - $ref: "#/components/parameters/agritelemPageToken"
+
+  /locations/{location-scheme}/{location-id}/remarks:
+    get:
+      parameters:
+        - $ref: "#/components/parameters/agritelemPageSize"
+        - $ref: "#/components/parameters/agritelemPageToken"
+    post:
+      responses:
+        "409":
+          description: >-
+            A remark with the same meta.source and meta.sourceId already exists
+            with different content. The stored remark is returned so the client
+            can adopt the server state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/agritelemRemarkConflict"
+
+  /agritelem/locations/{location-scheme}/{location-id}/herd-overview:
+    get:
+      operationId: get-herd-overview
+      summary: Herd status and KPIs for a location (Agritelem extension).
+      description: >-
+        Not part of ICAR ADE. Derives per-animal status from the most recent
+        complete UTC day of telemetry and from recent veterinary remarks.
+      parameters:
+        - $ref: "#/components/parameters/location-scheme"
+        - $ref: "#/components/parameters/location-id"
+      responses:
+        "200":
+          description: Herd overview.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/agritelemHerdOverview"
+        default:
+          $ref: "#/components/responses/default"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    agritelemPageSize:
+      name: page-size
+      in: query
+      description: Maximum number of members to return (Agritelem extension).
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 500
+        default: 100
+    agritelemPageToken:
+      name: page-token
+      in: query
+      description: >-
+        Opaque continuation token taken from `view.next` of the previous page
+        (Agritelem extension).
+      required: false
+      schema:
+        type: string
+        maxLength: 512
+
+  schemas:
+    icarObservationStatisticsType:
+      allOf:
+        - type: object
+          properties:
+            agritelem:
+              $ref: "#/components/schemas/agritelemStatisticsExtension"
+
+    icarRemarkEventResource:
+      allOf:
+        - type: object
+          properties:
+            agritelem:
+              $ref: "#/components/schemas/agritelemRemarkExtension"
+
+    agritelemStatisticsExtension:
+      description: >-
+        Derived at read time by the Agritelem cleaning pipeline. Absent on
+        statistics as submitted by gateways.
+      type: object
+      properties:
+        coverage:
+          description: Fraction of hourly epochs present in the window (0..1).
+          type: number
+          minimum: 0
+          maximum: 1
+        dataQuality:
+          $ref: "#/components/schemas/agritelemDataQuality"
+        baselineMedian:
+          description: Median of the trailing 14 daily values, when at least 7 exist.
+          type: ["number", "null"]
+        zScore:
+          description: Robust z-score, (value - baselineMedian) / (1.4826 * MAD).
+          type: ["number", "null"]
+        flags:
+          type: array
+          items:
+            $ref: "#/components/schemas/agritelemFlag"
+
+    agritelemDataQuality:
+      type: string
+      enum: [Verified, Imputed]
+
+    agritelemFlag:
+      description: Cross-metric findings for the window.
+      type: string
+      enum: [HeatSignature, TimeBudgetConflict, ThermalStress]
+
+    agritelemRemarkExtension:
+      type: object
+      properties:
+        category:
+          $ref: "#/components/schemas/agritelemRemarkCategory"
+
+    agritelemRemarkCategory:
+      type: string
+      enum: [General, Veterinary, Behaviour, Feeding]
+
+    agritelemRemarkConflict:
+      type: object
+      required: [errors, current]
+      properties:
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/icarResponseMessageResource"
+        current:
+          $ref: "#/components/schemas/icarRemarkEventResource"
+
+    agritelemAnimalStatus:
+      type: string
+      enum: [Normal, InHeat, VeterinaryAttention, HeatStress]
+
+    agritelemHerdOverview:
+      type: object
+      required: [asOf, day, kpis, animals]
+      properties:
+        asOf:
+          $ref: "#/components/schemas/icarDateTimeType"
+        day:
+          description: The complete UTC day the telemetry KPIs describe.
+          type: string
+          format: date
+        kpis:
+          type: object
+          required: [animalCount, estrusAlerts, heatStress, veterinaryAttention]
+          properties:
+            animalCount:
+              type: integer
+              minimum: 0
+            meanRuminationMinutes:
+              description: Mean daily rumination over animals with a verified day.
+              type: ["number", "null"]
+            estrusAlerts:
+              type: integer
+              minimum: 0
+            heatStress:
+              type: integer
+              minimum: 0
+            veterinaryAttention:
+              type: integer
+              minimum: 0
+        animals:
+          type: array
+          items:
+            $ref: "#/components/schemas/agritelemHerdAnimal"
+
+    agritelemHerdAnimal:
+      type: object
+      required: [animal, statuses]
+      properties:
+        animal:
+          $ref: "#/components/schemas/icarAnimalIdentifierType"
+        managementTag:
+          type: string
+        statuses:
+          type: array
+          items:
+            $ref: "#/components/schemas/agritelemAnimalStatus"
+        ruminationMinutes:
+          type: ["number", "null"]
