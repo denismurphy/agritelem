@@ -1,0 +1,18 @@
+# Generates ICAR/Agritelem types and a strict net/http server interface from
+# contracts/openapi.json. Regenerate with `make generate`.
+package: httpapi
+generate:
+  models: true
+  std-http-server: true
+  strict-server: true
+  embedded-spec: true
+output: oapi.gen.go
+output-options:
+  # Name inline schemas (e.g. collection `view`) so handlers can construct them.
+  generate-types-for-anonymous-schemas: true
+  # JSON numbers without a format default to float32 in oapi-codegen, which
+  # silently loses precision (e.g. 39.46 °C, z-scores). Use float64.
+  type-mapping:
+    number:
+      default:
+        type: float64
