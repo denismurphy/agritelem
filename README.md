@@ -1,5 +1,15 @@
 # Agritelem
 
+[![backend](https://img.shields.io/github/actions/workflow/status/denismurphy/agritelem/backend.yml?branch=main&label=backend&logo=githubactions&logoColor=white)](https://github.com/denismurphy/agritelem/actions/workflows/backend.yml)
+[![iOS](https://img.shields.io/github/actions/workflow/status/denismurphy/agritelem/ios.yml?branch=main&label=iOS&logo=githubactions&logoColor=white)](https://github.com/denismurphy/agritelem/actions/workflows/ios.yml)
+[![Go 1.27](https://img.shields.io/badge/Go-1.27-00ADD8?logo=go&logoColor=white)](backend/go.mod)
+[![Swift 6](https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white)](ios-client/Packages/AgritelemKit/Package.swift)
+[![iOS 26+](https://img.shields.io/badge/iOS-26%2B-000000?logo=apple&logoColor=white)](ios-client/project.yml)
+[![ICAR ADE 1.5.1](https://img.shields.io/badge/ICAR_ADE-1.5.1-2E8B57)](https://github.com/adewg/ICAR/releases/tag/v1.5.1)
+[![OpenAPI 3.1](https://img.shields.io/badge/OpenAPI-3.1-6BA539?logo=openapiinitiative&logoColor=white)](contracts/openapi.json)
+[![TimescaleDB 2.30 · PG17](https://img.shields.io/badge/TimescaleDB-2.30_%C2%B7_PG17-4169E1?logo=postgresql&logoColor=white)](compose.yaml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 **Precision livestock telemetry, end to end.** A Go ingestion and analytics backend on TimescaleDB, and an offline-first SwiftUI app for use on the farm. Both are generated from one OpenAPI contract built on the [ICAR Animal Data Exchange](https://github.com/adewg/ICAR) 1.5.1 standard.
 
 Sensors on each cow (rumen boluses, pedometers, collars) report through a farm gateway every hour. Agritelem:
