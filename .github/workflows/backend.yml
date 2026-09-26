@@ -1,0 +1,29 @@
+name: backend
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: |
+            backend/go.sum
+            backend/tools.sum
+      - name: Generated code is up to date
+        run: make check-generated
+      - name: Lint
+        run: make lint
+      - name: Unit tests
+        run: make test
+      - name: Integration tests
+        run: make test-integration
